@@ -54,11 +54,12 @@ class Expr_obj:
         self.op_type = self._get_op_type(obj_string)
         self.op_index = self._get_op_index(obj_string)
         self.obj_value = self._get_obj_value(obj_string,index)
+        self.obj_string = obj_string
 
 
     def __str__(self):
-        return "is_op: {}, op_type: {}, op_index: {}, obj_value: {}".format(self.is_op, self.op_type,
-                                                                               self.op_index,self.obj_value)
+        return "is_op: {}, op_type: {}, op_index: {}, obj_value: {}, obj_string: {}".format(self.is_op, self.op_type,
+                                                                               self.op_index,self.obj_value,self.obj_string)
     
     def _get_op_type(self,obj_string):
         if self.is_op:
@@ -94,8 +95,15 @@ class Evaluator:
 
         token_arr = self._tokenize(query)
 
-        # for token in token_arr:
-        #     print(token)
+        for elem in token_arr:
+            print(elem)
+
+        print("-----------------------------------------------------------")
+
+        poliz_arr = self._gen_poliz(token_arr)
+
+        for elem in poliz_arr:
+            print(elem)
 
         return None  
 
@@ -108,13 +116,10 @@ class Evaluator:
 
             token_str = "".join(char_arr)
             token = Expr_obj(token_str,self._index)
-            print(token,token_str)
             token_arr.append(token)
 
         cur_word = []
 
-        print(query)
-        
         for sym in query:
             if sym=="|" or sym=="(" or sym==")" or sym==" ":
 
@@ -136,8 +141,46 @@ class Evaluator:
 
     # converts array of tokens to poliz notation 
     def _gen_poliz(self,token_arr):
-        pass
-    
+        poliz = [] 
+        op_stack = [] 
+
+        # Shunting yard algorithm
+
+        for token in token_arr:
+            if token.is_op == False:
+                poliz.append(token)
+            else:
+                # if token found
+                if token.op_type=="(":
+                    op_stack.append(token)
+
+                elif token.op_type==(")"):
+                    while True:
+                        popped_token = op_stack.pop()
+                        if popped_token.op_type == "(":
+                            break
+                        else:
+                            poliz.append(popped_token)
+                else:
+                    # op_stack can be empty 
+                    while len(op_stack)>0:
+                        popped_token = op_stack.pop()
+
+                        # removing ops from op_stack until "(" or op with lower precedence foudn
+                        if (popped_token.op_type == "(") or (popped_token.op_index>token.op_index):
+                            op_stack.append(popped_token)
+                            break
+                        else:
+                            poliz.append(popped_token)
+
+                    op_stack.append(token)
+
+        while len(op_stack)>0:
+            poliz.append(op_stack.pop())
+
+        return poliz            
+
+                    
     # evaluates poliz notation 
     def _evaluate(self,query):
         pass  
