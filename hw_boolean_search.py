@@ -96,7 +96,12 @@ class Evaluator:
 
         poliz_arr = self._gen_poliz(token_arr)
 
-        result = self._evaluate(poliz_arr)
+        try:
+            result = self._evaluate(poliz_arr)
+        except:
+            print(query)
+            print(poliz_arr)
+            exit(1)
 
         # list of documents that are relevant to query 
         return result.obj_value  
@@ -196,8 +201,10 @@ class Evaluator:
             if elem.is_op == False:
                 stack.append(elem)
             else:
+            
                 op1 = stack.pop()
                 op2 = stack.pop()
+            
 
                 res_op = Expr_obj(obj_string=op1.obj_string+op2.obj_string,index = self._index)
                 # string concatenation can be removed, it is ineffective and redundant
@@ -250,16 +257,23 @@ class SearchResults:
             # writing header of csv file 
             csv_writer.writerow(self._csv_fields)
 
+            # reading header of objects.enumerate.txt
+            obj_file.readline()
+
             while True:
                 question_line = obj_file.readline().rstrip().split(",")
 
                 if question_line == [""]:
                     break
                 
+                try:
                  
-                obj_id = int(question_line[0])
-                query_id = int(question_line[1])
-                doc_num = int(question_line[2][1:])
+                    obj_id = int(question_line[0])
+                    query_id = int(question_line[1])
+                    doc_num = int(question_line[2][1:])
+                except:
+                    print(question_line)
+                    exit(1)
 
                 ans = self._is_relevant(query_id,doc_num)           
                 csv_writer.writerow([obj_id,ans])
