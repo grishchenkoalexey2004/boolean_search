@@ -17,24 +17,29 @@ import sys
 
 
 class Index:
-    def __init__(self, index_filepath):
+    def __init__(self):
         self._inv_index = dict()
-        self._fill_index(index_filepath)
     
-    def _fill_index(self,index_filepath):
+    #! all words are added to index in lowercase 
+    def fill_index(self,index_filepath):
         with open(index_filepath) as ind_file:
             for line in ind_file:
                 words = line.rstrip("\n").split()
                 doc_num = int(words[0][1:])
                 for i in range(1,len(words)):
-                    if (words[i].strip()) in self._inv_index:
-                        self._inv_index[words[i].strip()].add(doc_num)
-                    else:
-                        self._inv_index.update({(words[i]).strip():set([doc_num])})
 
+                    # transforming word to correct format
+                    cur_word = words[i].strip().lower()
+                    if (words[i].strip().lower()) in self._inv_index:
+                        self._inv_index[cur_word].add(doc_num)
+                    else:
+                        self._inv_index.update({cur_word:set([doc_num])})
+
+    #! all terms must be searched in lowercase format
     def fetch_docset(self,term):
-        if term in self._inv_index:
-            return self._inv_index[term]
+        term_lower = term.lower()
+        if term_lower in self._inv_index:
+            return self._inv_index[term_lower]
         else:
             return set()
 
@@ -265,7 +270,10 @@ def main():
     args = parser.parse_args()
 
     # Build index.
-    index = Index(args.docs_file)
+    index = Index()
+    index.fill_index(args.docs_file)
+
+
     evaluator = Evaluator(index)
 
 
