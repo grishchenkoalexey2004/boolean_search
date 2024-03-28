@@ -3,8 +3,7 @@
 
 import argparse
 import codecs
-import sys
-
+from csv import writer
 #! to fix: 
 
 #
@@ -22,7 +21,7 @@ class Index:
     
     #! all words are added to index in lowercase 
     def fill_index(self,index_filepath):
-        with open(index_filepath) as ind_file:
+        with codecs.open(index_filepath,mode="r",encoding="utf-8") as ind_file:
             for line in ind_file:
                 words = line.rstrip("\n").split()
                 doc_num = int(words[0][1:])
@@ -229,6 +228,7 @@ class SearchResults:
     def __init__(self):
         # element with ith index stores search results of ith query 
         self._search_results = [set()]
+        self._csv_fields = ["ObjectId","Relevance"]
 
     def add(self, new_search_result):
         self._search_results.append(new_search_result)
@@ -243,7 +243,13 @@ class SearchResults:
                 
 
     def print_submission(self, objects_filepath, submission_filepath):
-        with codecs.open(objects_filepath, mode='r', encoding='utf-8') as obj_file:
+        with codecs.open(objects_filepath, mode='r', encoding='utf-8') as obj_file, open(submission_filepath,"w") as csv_file:
+            
+            csv_writer = writer(csv_file,delimiter=",")
+            
+            # writing header of csv file 
+            csv_writer.writerow(self._csv_fields)
+
             while True:
                 question_line = obj_file.readline().rstrip().split(",")
 
@@ -256,7 +262,7 @@ class SearchResults:
                 doc_num = int(question_line[2][1:])
 
                 ans = self._is_relevant(query_id,doc_num)           
-                print(obj_id,ans) # must implement as csv file
+                csv_writer.writerow([obj_id,ans])
 
 
 

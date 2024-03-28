@@ -3,4 +3,4 @@ docker run -it  --rm --name boolean-search -v %~dp0:/boolean_search -w /boolean_
     --queries_file /boolean_search/data/queries_shortened.txt ^
     --objects_file  /boolean_search/data/objects_shortened.txt ^
     --docs_file /boolean_search/data/docs_shortened.txt ^
-    --submission_file /boolean_search/output.csv
+    --submission_file /boolean_search/data/output.csv
