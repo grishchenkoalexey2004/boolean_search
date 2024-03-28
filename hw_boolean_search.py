@@ -36,7 +36,7 @@ class Index:
         if term in self._inv_index:
             return self._inv_index[term]
         else:
-            return dict()
+            return set()
 
     def print_index(self):
         for key,value in self._inv_index.items():
@@ -53,7 +53,7 @@ class Expr_obj:
         self.is_op = obj_string in self.operations
         self.op_type = self._get_op_type(obj_string)
         self.op_index = self._get_op_index(obj_string)
-        self.obj_value = self._get_obj_value(obj_string,index)
+        self.obj_value = None 
         self.obj_string = obj_string
 
 
@@ -73,12 +73,8 @@ class Expr_obj:
         else:
             return None
     
-    def _get_obj_value(self,obj_string,index):
-        if self.is_op == False:
-            return index.fetch_docset(obj_string)
-        else:
-            return None
-
+    def set_obj_value(self,doc_set):
+        self.obj_value = doc_set
 
 
 
@@ -92,30 +88,29 @@ class Evaluator:
     # first function to be called when processing query 
     def get_relevant_docs(self,query):
 
-
         token_arr = self._tokenize(query)
-
-        for elem in token_arr:
-            print(elem)
-
-        print("-----------------------------------------------------------")
 
         poliz_arr = self._gen_poliz(token_arr)
 
-        for elem in poliz_arr:
-            print(elem)
+        result = self._evaluate(poliz_arr)
 
-        return None  
+        # list of documents that are relevant to query 
+        return result.obj_value  
 
-    # splits query into tokens and returns array of tokens in same order 
+    # splits query into tokens and returns array of tokens (objects of Expr_obj)
     def _tokenize(self,query):
 
         token_arr = [] 
 
-        def add_word(char_arr,token_arr):
+        def add_word(char_arr,token_arr,is_op=False):
 
             token_str = "".join(char_arr)
             token = Expr_obj(token_str,self._index)
+
+            if not is_op:
+                rel_docs = self._index.fetch_docset(token_str)
+                token.set_obj_value(rel_docs)
+
             token_arr.append(token)
 
         cur_word = []
@@ -124,16 +119,16 @@ class Evaluator:
             if sym=="|" or sym=="(" or sym==")" or sym==" ":
 
                 if len(cur_word)>0:
-                    add_word(cur_word,token_arr)
+                    add_word(cur_word,token_arr,is_op=False)
                     cur_word.clear() 
 
-                add_word([sym],token_arr)
+                add_word([sym],token_arr,is_op=True)
 
             else:
                 cur_word.append(sym)
         
         if len(cur_word)>0:
-            add_word(cur_word,token_arr)
+            add_word(cur_word,token_arr,is_op=False)
         
 
         return token_arr
@@ -182,23 +177,82 @@ class Evaluator:
 
                     
     # evaluates poliz notation 
-    def _evaluate(self,query):
-        pass  
+    def _evaluate(self,poliz):
+
+
+        def print_stack(stack):
+            for elem in stack:
+                print(elem)
+            
+            print("-----------------------------------")
+
+        stack = [] 
+
+        for elem in poliz:
+            if elem.is_op == False:
+                stack.append(elem)
+            else:
+                op1 = stack.pop()
+                op2 = stack.pop()
+
+                res_op = Expr_obj(obj_string=op1.obj_string+op2.obj_string,index = self._index)
+                # string concatenation can be removed, it is ineffective and redundant
+
+
+                if elem.op_type == "|":
+                    #logical or
+                    expr_value = op1.obj_value.union(op2.obj_value)
+                else:
+                    # logical and 
+                    expr_value = op1.obj_value.intersection(op2.obj_value)
+                    
+                
+                res_op.set_obj_value(expr_value)
+                stack.append(res_op)
+
+        return stack[0]
+    
 
     # resets class fields
     def reset(self):
-        self._cur_result = dict()
+        self._cur_result = set()
 
 
 
 class SearchResults:
-    def add(self, found):
-        # TODO: add next query's results
-        pass
 
-    def print_submission(self, objects_file, submission_file):
-        # TODO: generate submission file
-        pass
+    def __init__(self):
+        # element with ith index stores search results of ith query 
+        self._search_results = [set()]
+
+    def add(self, new_search_result):
+        self._search_results.append(new_search_result)
+
+
+    # returns 1 if query with query_id is relevant to doc with doc_num, otherwise returns 0 
+    def _is_relevant(self,query_id,doc_num):
+        if doc_num in self._search_results[query_id]:
+            return 1
+        else:
+            return 0 
+                
+
+    def print_submission(self, objects_filepath, submission_filepath):
+        with codecs.open(objects_filepath, mode='r', encoding='utf-8') as obj_file:
+            while True:
+                question_line = obj_file.readline().rstrip().split(",")
+
+                if question_line == [""]:
+                    break
+                
+                 
+                obj_id = int(question_line[0])
+                query_id = int(question_line[1])
+                doc_num = int(question_line[2][1:])
+
+                ans = self._is_relevant(query_id,doc_num)           
+                print(obj_id,ans) # must implement as csv file
+
 
 
 def main():
@@ -219,7 +273,7 @@ def main():
     search_results = SearchResults()
     with codecs.open(args.queries_file, mode='r', encoding='utf-8') as queries_fh:
         for line in queries_fh:
-            fields = line.rstrip('\n').split('\t')
+            fields = line.rstrip().split('\t')
             qid = int(fields[0])
             query = fields[1]
 
@@ -227,11 +281,11 @@ def main():
             evaluator.reset()
             query_result  = evaluator.get_relevant_docs(query)
             
-            # search_results.add(query_result)
+            search_results.add(query_result)
 
     # Generate submission file.
     search_results.print_submission(args.objects_file, args.submission_file)
-    #index.print_index()
+
 
 if __name__ == "__main__":
     main()
