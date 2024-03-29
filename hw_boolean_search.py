@@ -18,9 +18,34 @@ from csv import writer
 class Index:
     def __init__(self):
         self._inv_index = dict()
+        self._stop_words = set()
+        
     
+
+    def _load_stopwords(self,stopword_filepath):
+
+        # all stopwords are already in lowercase 
+        with codecs.open(stopword_filepath,mode="r",encoding="utf-8") as stopword_file:
+            for line in stopword_file:
+                stopword = line.rstrip()
+                self._stop_words.add(stopword)
+
+    # returns True if word should be indexed, otherwise returns false
+    def _is_indexable(self,word):
+        is_int = True
+        try:
+            int_repr = int(word)
+
+        except:
+            is_int = False
+
+        return not(is_int) and (not word in self._stop_words)
+
     #! all words are added to index in lowercase 
-    def fill_index(self,index_filepath):
+    def fill_index(self,index_filepath,stopword_filepath):
+
+        self._load_stopwords(stopword_filepath)
+
         with codecs.open(index_filepath,mode="r",encoding="utf-8") as ind_file:
             for line in ind_file:
                 words = line.rstrip("\n").split()
@@ -29,6 +54,10 @@ class Index:
 
                     # transforming word to correct format
                     cur_word = words[i].strip().lower()
+
+                    if not self._is_indexable(cur_word):
+                        continue
+
                     if (words[i].strip().lower()) in self._inv_index:
                         self._inv_index[cur_word].add(doc_num)
                     else:
@@ -42,6 +71,7 @@ class Index:
         else:
             return set()
 
+    # for testing purposes only!
     def print_index(self):
         for key,value in self._inv_index.items():
             print(key,value)    
@@ -96,13 +126,9 @@ class Evaluator:
 
         poliz_arr = self._gen_poliz(token_arr)
 
-        try:
-            result = self._evaluate(poliz_arr)
-        except:
-            print(query)
-            print(poliz_arr)
-            exit(1)
-
+        
+        result = self._evaluate(poliz_arr)
+        
         # list of documents that are relevant to query 
         return result.obj_value  
 
@@ -266,14 +292,11 @@ class SearchResults:
                 if question_line == [""]:
                     break
                 
-                try:
-                 
-                    obj_id = int(question_line[0])
-                    query_id = int(question_line[1])
-                    doc_num = int(question_line[2][1:])
-                except:
-                    print(question_line)
-                    exit(1)
+                
+                obj_id = int(question_line[0])
+                query_id = int(question_line[1])
+                doc_num = int(question_line[2][1:])
+                
 
                 ans = self._is_relevant(query_id,doc_num)           
                 csv_writer.writerow([obj_id,ans])
@@ -286,12 +309,13 @@ def main():
     parser.add_argument('--queries_file', required = True, help='queries.numerate.txt')
     parser.add_argument('--objects_file', required = True, help='objects.numerate.txt')
     parser.add_argument('--docs_file', required = True, help='docs.tsv')
+    parser.add_argument('--stop_word_list', required=False,help = "file with stopwords")
     parser.add_argument('--submission_file', required = True, help='output file with relevances')
     args = parser.parse_args()
 
     # Build index.
     index = Index()
-    index.fill_index(args.docs_file)
+    index.fill_index(args.docs_file,args.stop_word_list)
 
 
     evaluator = Evaluator(index)
@@ -314,6 +338,7 @@ def main():
     # Generate submission file.
     search_results.print_submission(args.objects_file, args.submission_file)
 
+    # index.print_index()
 
 if __name__ == "__main__":
     main()
