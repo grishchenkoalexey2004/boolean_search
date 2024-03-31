@@ -256,9 +256,9 @@ class SearchResults:
 
     def print_submission(self, objects_filepath, submission_filepath):
         with codecs.open(objects_filepath, mode='r', encoding='utf-8') as obj_file:
-            with open(submission_filepath, mode= "w",encoding="utf-8",newline="",) as csv_file:
+            with open(submission_filepath, mode= "w",encoding="utf-8") as csv_file:
             
-                csv_writer = writer(csv_file,delimiter=",",lineterminator="\n")
+                csv_writer = writer(csv_file,delimiter=",",lineterminator="\r\n")
                 
                 # writing header of csv file 
                 csv_writer.writerow(self._csv_fields)
@@ -280,6 +280,8 @@ class SearchResults:
 
                     ans = self._is_relevant(query_id,doc_num)           
                     csv_writer.writerow([obj_id,ans])
+                csv_file.truncate(csv_file.tell()-2)
+
 
 
 
