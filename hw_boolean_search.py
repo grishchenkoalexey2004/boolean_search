@@ -62,8 +62,8 @@ class Expr_obj:
 
 
     def __str__(self):
-        return "is_op: {}, op_type: {}, op_index: {}, obj_value: {}, obj_string: {}".format(self.is_op, self.op_type,
-                                                                               self.op_index,self.obj_value,self.obj_string)
+        return "is_op: {}, op_type: {}, op_index: {}, obj_string: {}".format(self.is_op, self.op_type,
+                                                                               self.op_index,self.obj_string)
     
     def _get_op_type(self,obj_string):
         if self.is_op:
@@ -93,19 +93,33 @@ class Evaluator:
     # first function to be called when processing query 
     # returns True if doc with doc_id is relevant to query
     def is_relevant(self,query,doc_id):
-        final_result = set() 
 
         token_arr = self._tokenize(query)
 
-        # generates poliz variants according to soft-boolean search strategy (see above, right below import section)
-        poliz_variants = self._gen_poliz_variants(token_arr)
+        # dividing expression by ands on the highest level
+        expr_parts = self._split_by_and(token_arr)
 
-        for poliz in poliz_variants:
-            result = self._evaluate(poliz)
-            if doc_id in result.obj_value:
+        # if more than 50% of expressions are relevant to document - document is relevant is deemed to be relevant
+        # for whole expression 
+
+
+        relevant_count = 0 
+        dec_bound = len(expr_parts)*0.4
+
+        for part in expr_parts:
+            
+            poliz_part = self._gen_poliz(part)
+            result = self._evaluate(poliz_part)
+
+            if doc_id in result:
+                relevant_count+=1
+
+            if relevant_count>dec_bound:
                 return True
             
         return False
+
+
 
     # splits query into tokens and returns array of tokens (objects of Expr_obj)
     def _tokenize(self,query):
@@ -143,21 +157,42 @@ class Evaluator:
 
         return token_arr
     
-    def _count_and_ops(self,token_arr):
-        count =0 
+    # splits expression by and on the upper level 
+    def _split_by_and(self,token_arr):
+        splits = [] 
+
+        first_pos = 0 
         ind = 0 
+
+        brack_balance = 0 
 
         while (ind<len(token_arr)):
             if token_arr[ind].op_type == "(":
-                while token_arr[ind].op_type!=")":
-                    ind+=1
+                
+                brack_balance+=1 
+                ind+=1
+
+            elif token_arr[ind].op_type == ")":
+                brack_balance-=1
+                ind+=1
+
             
-            elif token_arr[ind].op_type == " ":
-                count+=1
+            elif token_arr[ind].op_type == " " and (brack_balance==0):
+                splits.append(token_arr[first_pos:ind])
+                first_pos = ind+1
+                ind+=1
+
+            elif token_arr[ind].op_type == "|":
                 ind+=1
 
             else:
                 ind+=1
+                pass # we don't make splits insidde
+
+        splits.append(token_arr[first_pos:ind])
+
+        return splits
+    
 
  # converts array of tokens to poliz notation 
     def _gen_poliz(self,token_arr):
@@ -238,7 +273,7 @@ class Evaluator:
                 res_op.set_obj_value(expr_value)
                 stack.append(res_op)
 
-        return stack[0]
+        return stack[0].obj_value
     
 
     # resets class fields
