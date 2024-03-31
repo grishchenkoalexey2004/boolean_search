@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+
+
 import argparse
 import codecs
 from csv import writer
-#! to fix: 
 
-#
-
+# soft boolean search stategy
 
 
-#! optimization 
-
-# 2) вместо одного большого словаря можно создать массив словарей
-
+"""
+    Creating all possible poliz variants, where number of replaced AND operators on the highest level
+    is less than half of all AND operators on the highest level 
+"""
 
 class Index:
     def __init__(self):
@@ -91,17 +91,21 @@ class Evaluator:
         
 
     # first function to be called when processing query 
-    def get_relevant_docs(self,query):
+    # returns True if doc with doc_id is relevant to query
+    def is_relevant(self,query,doc_id):
+        final_result = set() 
 
         token_arr = self._tokenize(query)
 
-        poliz_arr = self._gen_poliz(token_arr)
+        # generates poliz variants according to soft-boolean search strategy (see above, right below import section)
+        poliz_variants = self._gen_poliz_variants(token_arr)
 
-        result = self._evaluate(poliz_arr)
-        
-
-        # list of documents that are relevant to query 
-        return result.obj_value  
+        for poliz in poliz_variants:
+            result = self._evaluate(poliz)
+            if doc_id in result.obj_value:
+                return True
+            
+        return False
 
     # splits query into tokens and returns array of tokens (objects of Expr_obj)
     def _tokenize(self,query):
@@ -138,8 +142,24 @@ class Evaluator:
         
 
         return token_arr
+    
+    def _count_and_ops(self,token_arr):
+        count =0 
+        ind = 0 
 
-    # converts array of tokens to poliz notation 
+        while (ind<len(token_arr)):
+            if token_arr[ind].op_type == "(":
+                while token_arr[ind].op_type!=")":
+                    ind+=1
+            
+            elif token_arr[ind].op_type == " ":
+                count+=1
+                ind+=1
+
+            else:
+                ind+=1
+
+ # converts array of tokens to poliz notation 
     def _gen_poliz(self,token_arr):
         poliz = [] 
         op_stack = [] 
@@ -179,6 +199,7 @@ class Evaluator:
             poliz.append(op_stack.pop())
 
         return poliz            
+      
 
                     
     # evaluates poliz notation 
@@ -247,8 +268,10 @@ class SearchResults:
     # returns 1 if query with query_id is relevant to doc with doc_num, otherwise returns 0 
     def _is_relevant(self,query_id,doc_num):
         
-        rel_docs = self._query_evaluator.get_relevant_docs(self._query_base[query_id])
-        if doc_num in rel_docs:
+        # bool value is returned 
+        is_relevant  = self._query_evaluator.is_relevant(self._query_base[query_id],doc_num)
+        # converting bool value to 1-0 type
+        if is_relevant:
             return 1
         else:
             return 0 
