@@ -11,8 +11,9 @@ from csv import writer
 
 
 """
-    Creating all possible poliz variants, where number of replaced AND operators on the highest level
-    is less than half of all AND operators on the highest level 
+    Soft boolean search strategy:
+    Splitting expression into parts by AND operators on higher level
+    If doc is relevant for more than 40% of parts - it is deemed to be relevant for the whole query!
 """
 
 class Index:
