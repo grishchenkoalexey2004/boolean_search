@@ -53,7 +53,7 @@ class Expr_obj:
 
 
     #! retrieve data by directly accessing fields
-    def __init__(self,obj_string,index):
+    def __init__(self,obj_string):
         self.is_op = obj_string in self.operations
         self.op_type = self._get_op_type(obj_string)
         self.op_index = self._get_op_index(obj_string)
@@ -88,6 +88,7 @@ class Evaluator:
     def __init__(self,index):
         self._cur_result = {}
         self._index = index 
+        
 
     # first function to be called when processing query 
     def get_relevant_docs(self,query):
@@ -96,12 +97,8 @@ class Evaluator:
 
         poliz_arr = self._gen_poliz(token_arr)
 
-        try:
-            result = self._evaluate(poliz_arr)
-        except:
-            print(query)
-            print(poliz_arr)
-            exit(1)
+        result = self._evaluate(poliz_arr)
+        
 
         # list of documents that are relevant to query 
         return result.obj_value  
@@ -114,7 +111,7 @@ class Evaluator:
         def add_word(char_arr,token_arr,is_op=False):
 
             token_str = "".join(char_arr)
-            token = Expr_obj(token_str,self._index)
+            token = Expr_obj(token_str)
 
             if not is_op:
                 rel_docs = self._index.fetch_docset(token_str)
@@ -141,7 +138,6 @@ class Evaluator:
         
 
         return token_arr
-    
 
     # converts array of tokens to poliz notation 
     def _gen_poliz(self,token_arr):
@@ -206,7 +202,7 @@ class Evaluator:
                 op2 = stack.pop()
             
 
-                res_op = Expr_obj(obj_string=op1.obj_string+op2.obj_string,index = self._index)
+                res_op = Expr_obj(obj_string=op1.obj_string+op2.obj_string)
                 # string concatenation can be removed, it is ineffective and redundant
 
 
@@ -232,51 +228,58 @@ class Evaluator:
 
 class SearchResults:
 
-    def __init__(self):
+    def __init__(self,evaluator):
         # element with ith index stores search results of ith query 
-        self._search_results = [set()]
+        self._query_evaluator = evaluator 
+        self._query_base = [""] # all queries strings are stored in this array 
         self._csv_fields = ["ObjectId","Relevance"]
 
-    def add(self, new_search_result):
-        self._search_results.append(new_search_result)
+   
+    def fill_query_base(self,query_file):
+        with codecs.open(query_file, mode='r', encoding='utf-8') as queries_fh:
+            for line in queries_fh:
+                fields = line.rstrip().split('\t')
+                qid = int(fields[0])
+                query = fields[1]
+                self._query_base.append(query)
 
 
     # returns 1 if query with query_id is relevant to doc with doc_num, otherwise returns 0 
     def _is_relevant(self,query_id,doc_num):
-        if doc_num in self._search_results[query_id]:
+        
+        rel_docs = self._query_evaluator.get_relevant_docs(self._query_base[query_id])
+        if doc_num in rel_docs:
             return 1
         else:
             return 0 
                 
 
     def print_submission(self, objects_filepath, submission_filepath):
-        with codecs.open(objects_filepath, mode='r', encoding='utf-8') as obj_file, open(submission_filepath,"w") as csv_file:
+        with codecs.open(objects_filepath, mode='r', encoding='utf-8') as obj_file:
+            with open(submission_filepath, mode= "w",encoding="utf-8",newline="",) as csv_file:
             
-            csv_writer = writer(csv_file,delimiter=",")
-            
-            # writing header of csv file 
-            csv_writer.writerow(self._csv_fields)
-
-            # reading header of objects.enumerate.txt
-            obj_file.readline()
-
-            while True:
-                question_line = obj_file.readline().rstrip().split(",")
-
-                if question_line == [""]:
-                    break
+                csv_writer = writer(csv_file,delimiter=",",lineterminator="\n")
                 
-                try:
-                 
+                # writing header of csv file 
+                csv_writer.writerow(self._csv_fields)
+
+                # reading header of objects.enumerate.txt
+                obj_file.readline()
+
+                while True:
+                    question_line = obj_file.readline().rstrip().split(",")
+
+                    if question_line == [""]:
+                        break
+                    
+                    
                     obj_id = int(question_line[0])
                     query_id = int(question_line[1])
                     doc_num = int(question_line[2][1:])
-                except:
-                    print(question_line)
-                    exit(1)
+                
 
-                ans = self._is_relevant(query_id,doc_num)           
-                csv_writer.writerow([obj_id,ans])
+                    ans = self._is_relevant(query_id,doc_num)           
+                    csv_writer.writerow([obj_id,ans])
 
 
 
@@ -298,18 +301,8 @@ def main():
 
 
     # Process queries.  
-    search_results = SearchResults()
-    with codecs.open(args.queries_file, mode='r', encoding='utf-8') as queries_fh:
-        for line in queries_fh:
-            fields = line.rstrip().split('\t')
-            qid = int(fields[0])
-            query = fields[1]
-
-            # process query 
-            evaluator.reset()
-            query_result  = evaluator.get_relevant_docs(query)
-            
-            search_results.add(query_result)
+    search_results = SearchResults(evaluator)
+    search_results.fill_query_base(args.queries_file)
 
     # Generate submission file.
     search_results.print_submission(args.objects_file, args.submission_file)
